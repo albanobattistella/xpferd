@@ -1,0 +1,275 @@
+<script lang="ts">
+  import { onMount } from 'svelte';
+  import { push } from 'svelte-spa-router';
+  import { invoiceApi } from '../lib/api/invoiceApi';
+  import { fmtCurrency, fmtDate as formatDateStr } from '../../shared/constants/format';
+  import { getSettings } from '../lib/settingsStore.svelte.js';
+  import { t } from '../lib/i18n.js';
+
+  let invoices: any[] = $state([]);
+  let loading = $state(true);
+  let error = $state('');
+
+  onMount(load);
+
+  async function load() {
+    loading = true;
+    error = '';
+    try {
+      invoices = await invoiceApi.list();
+    } catch (e: any) {
+      error = e.message;
+    } finally {
+      loading = false;
+    }
+  }
+
+  async function handleDelete(id: number) {
+    if (!confirm(t('dashboard.confirm_loeschen'))) return;
+    try {
+      await invoiceApi.delete(id);
+      await load();
+    } catch (e: any) {
+      error = e.message;
+    }
+  }
+
+  async function handleDuplicate(id: number) {
+    try {
+      const dup = await invoiceApi.duplicate(id);
+      push(`/invoices/${dup.id}`);
+    } catch (e: any) {
+      error = e.message;
+    }
+  }
+
+  function handleExport(id: number) {
+    window.open(invoiceApi.exportUrl(id), '_blank');
+  }
+
+  function fmtDate(d: string): string {
+    return formatDateStr(d, getSettings().dateFormat);
+  }
+</script>
+
+<div class="page-header">
+  <div class="page-title-group">
+    <h1>{t('dashboard.title')}</h1>
+    <p class="subtitle">{invoices.length} {invoices.length === 1 ? t('dashboard.subtitle_singular') : t('dashboard.subtitle_plural')} {t('dashboard.subtitle_gesamt')}</p>
+  </div>
+  {#if invoices.length > 0}
+    <button class="primary" onclick={() => push('/invoices/new')}>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+        <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+      </svg>
+      {t('dashboard.neue_rechnung')}
+    </button>
+  {/if}
+</div>
+
+{#if error}
+  <div class="error-banner">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+      <circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>
+    </svg>
+    {error}
+  </div>
+{/if}
+
+{#if loading}
+  <div class="loading-card">
+    <div class="loading-pulse"></div>
+    <span>{t('dashboard.laden')}</span>
+  </div>
+{:else if invoices.length === 0}
+  <div class="empty-state">
+    <div class="empty-illustration">
+      <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+        <polyline points="14 2 14 8 20 8"/>
+        <line x1="12" y1="18" x2="12" y2="12"/>
+        <line x1="9" y1="15" x2="15" y2="15"/>
+      </svg>
+    </div>
+    <h2>{t('dashboard.noch_keine')}</h2>
+    <p>{t('dashboard.noch_keine_text')}</p>
+    <button class="primary" onclick={() => push('/invoices/new')}>{t('dashboard.erste_erstellen')}</button>
+  </div>
+{:else}
+  <div class="table-card">
+    <table>
+      <thead>
+        <tr>
+          <th>{t('dashboard.col_rechnungsnr')}</th>
+          <th>{t('dashboard.col_datum')}</th>
+          <th>{t('dashboard.col_empfaenger')}</th>
+          <th class="text-right">{t('dashboard.col_betrag')}</th>
+          <th class="col-actions"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {#each invoices as inv, i}
+          <tr style="animation-delay: {i * 30}ms" class="row-enter">
+            <td>
+              <span class="invoice-number">{inv.invoiceNumber}</span>
+            </td>
+            <td class="mono date-cell">{fmtDate(inv.invoiceDate)}</td>
+            <td class="buyer-cell">{inv.buyerName}</td>
+            <td class="text-right mono amount-cell">{fmtCurrency(inv.totalGrossAmount, inv.currencyCode, getSettings().numberFormat)}</td>
+            <td>
+              <div class="actions">
+                <button class="ghost" onclick={() => push(`/invoices/${inv.id}`)}>
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                  </svg>
+                  {t('dashboard.bearbeiten')}
+                </button>
+                <button class="ghost" onclick={() => handleExport(inv.id)}>{t('dashboard.xml')}</button>
+                <button class="ghost" onclick={() => handleDuplicate(inv.id)}>{t('dashboard.kopieren')}</button>
+                <button class="danger" onclick={() => handleDelete(inv.id)}>{t('dashboard.loeschen')}</button>
+              </div>
+            </td>
+          </tr>
+        {/each}
+      </tbody>
+    </table>
+  </div>
+{/if}
+
+<style>
+  .page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 1.5rem;
+  }
+
+  .page-title-group {
+    display: flex;
+    flex-direction: column;
+  }
+
+  h1 {
+    font-family: var(--font-display), sans-serif;
+    font-size: 1.65rem;
+    font-weight: 700;
+    letter-spacing: -0.025em;
+    line-height: 1.2;
+    color: var(--text);
+  }
+
+  .subtitle {
+    font-size: 0.8125rem;
+    color: var(--text-muted);
+    margin-top: 0.2rem;
+  }
+
+  .error-banner {
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    color: var(--danger);
+    padding: 0.65rem 1rem;
+    border-radius: var(--radius);
+    font-size: 0.8125rem;
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .loading-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 3.5rem 2rem;
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 0.875rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+  }
+
+  .loading-pulse {
+    width: 32px;
+    height: 32px;
+    border: 2px solid var(--border);
+    border-top-color: var(--primary);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+
+  .empty-state {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-xl);
+    padding: 4rem 2rem;
+    text-align: center;
+    animation: slideUp 0.4s var(--ease-out);
+  }
+
+  .empty-illustration {
+    margin-bottom: 1.25rem;
+    color: var(--border-strong);
+  }
+
+  .empty-state h2 {
+    font-family: var(--font-display), sans-serif;
+    font-size: 1.15rem;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 0.4rem;
+  }
+
+  .empty-state p {
+    color: var(--text-muted);
+    font-size: 0.875rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .table-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    animation: slideUp 0.3s var(--ease-out);
+  }
+
+  .row-enter {
+    animation: fadeIn 0.3s var(--ease-out) both;
+  }
+
+  .invoice-number {
+    font-weight: 600;
+    color: var(--primary);
+    letter-spacing: -0.01em;
+  }
+
+  .date-cell {
+    color: var(--text-secondary);
+  }
+
+  .buyer-cell {
+    font-weight: 500;
+  }
+
+  .amount-cell {
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+
+  tbody tr {
+    cursor: default;
+  }
+
+  .col-actions {
+    width: 1%;
+    white-space: nowrap;
+  }
+</style>

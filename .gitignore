@@ -1,0 +1,33 @@
+### IDE ###
+.vscode/
+.idea
+*.iml
+
+### Mac OS ###
+.DS_Store
+
+### Claude ###
+.claude
+CLAUDE.md
+**/skills
+
+### Node ###
+node_modules/
+dist/
+*.tsbuildinfo
+
+### Data ###
+data/
+*.db
+
+### Test ###
+test/.test*.db*
+
+### Spec PDF ###
+*.pdf
+
+### pnpm ###
+.pnpm-store
+
+### Other ###
+*.otf

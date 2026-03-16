@@ -1,0 +1,41 @@
+services:
+  dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+      args:
+        VERSION: dev
+    volumes:
+      - .:/app
+      - /app/node_modules
+    ports:
+      - "4000:3000"
+    environment:
+      - VERSION=dev
+    command: sh -c "pnpm install && node build-client.js && pnpm dev"
+
+  test:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    volumes:
+      - ./src:/app/src
+      - ./test:/app/test
+      - ./package.json:/app/package.json
+      - ./pnpm-lock.yaml:/app/pnpm-lock.yaml
+      - ./tsconfig.json:/app/tsconfig.json
+    command: sh -c "pnpm install && pnpm test"
+
+  production:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        VERSION: dev
+    ports:
+      - "4000:3000"
+    volumes:
+      - xrechnung-data:/app/data
+
+volumes:
+  xrechnung-data:
